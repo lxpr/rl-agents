@@ -1,0 +1,5 @@
+{
+    "__class__": "<class 'rl_agents.agents.idm.IDMAgent'>",
+    "gamma": 0.99,
+    "env_preprocessors": [{"method":"simplify"}]
+}
