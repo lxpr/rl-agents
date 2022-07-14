@@ -7,18 +7,19 @@ from rl_agents.agents.tree_search.abstract import Node, AbstractTreeSearchAgent,
 from rl_agents.agents.tree_search.olop import OLOP
 from highway_env.vehicle.behavior import LinearVehicle
 from highway_env.envs.common.action import action_factory
+from rl_agents.agents.deep_q_network.pytorch import DQNAgent
 
 logger = logging.getLogger(__name__)
 
 
-class OSLAIDMAgent(AbstractTreeSearchAgent):
+class OSLAApproxAgent(AbstractTreeSearchAgent):
     """
-        An agent that uses One Step Look Ahead to plan a sequence of action in an MDP.
+        An agent that uses One Step Look Ahead with terminal cost function approximation to plan a sequence of action in an MDP.
     """
     def make_planner(self):
-        prior_policy = OSLAIDMAgent.policy_factory(self.config["prior_policy"])
-        rollout_policy = OSLAIDMAgent.policy_factory(self.config["rollout_policy"])
-        return OSLAIDM(self.env, prior_policy, rollout_policy, self.config)
+        # prior_policy = OSLAApproxAgent.policy_factory(self.config["prior_policy"])
+        # rollout_policy = OSLAApproxAgent.policy_factory(self.config["rollout_policy"])
+        return OSLAApprox(self.env, self.config)
 
     @classmethod
     def default_config(cls):
@@ -27,129 +28,137 @@ class OSLAIDMAgent(AbstractTreeSearchAgent):
             "budget": 300,
             "horizon": 10,
             "episodes": 5,
-            "prior_policy": {
-                "type": "preference",
-                "action": 3,
-                "ratio": 2
-            },
-            "rollout_policy": {"type": "preference",
-                "action": 1,
-                "ratio": 3
-                },
+            # "prior_policy": {
+            #     "type": "preference",
+            #     "action": 3,
+            #     "ratio": 2
+            # },
+            # "rollout_policy": {"type": "preference",
+            #     "action": 1,
+            #     "ratio": 3
+            #     },
             "env_preprocessors": []
          })
         return config
 
-    @staticmethod
-    def policy_factory(policy_config):
-        if policy_config["type"] == "random":
-            return OSLAIDMAgent.random_policy
-        elif policy_config["type"] == "random_available":
-            return OSLAIDMAgent.random_available_policy
-        elif policy_config["type"] == "preference":
-            return partial(OSLAIDMAgent.preference_policy,
-                           action_index=policy_config["action"],
-                           ratio=policy_config["ratio"])
-        elif policy_config["type"] == "idle":
-            return OSLAIDMAgent.idle_policy
-        else:
-            raise ValueError("Unknown policy type")
+    # @staticmethod
+    # def policy_factory(policy_config):
+    #     if policy_config["type"] == "random":
+    #         return OSLAIDMAgent.random_policy
+    #     elif policy_config["type"] == "random_available":
+    #         return OSLAIDMAgent.random_available_policy
+    #     elif policy_config["type"] == "preference":
+    #         return partial(OSLAIDMAgent.preference_policy,
+    #                        action_index=policy_config["action"],
+    #                        ratio=policy_config["ratio"])
+    #     elif policy_config["type"] == "idle":
+    #         return OSLAIDMAgent.idle_policy
+    #     else:
+    #         raise ValueError("Unknown policy type")
 
-    @staticmethod
-    def random_policy(state, observation):
-        """
-            Choose actions from a uniform distribution.
+    # @staticmethod
+    # def random_policy(state, observation):
+    #     """
+    #         Choose actions from a uniform distribution.
+    #
+    #     :param state: the environment state
+    #     :param observation: the corresponding observation
+    #     :return: a tuple containing the actions and their probabilities
+    #     """
+    #     actions = np.arange(state.action_space.n)
+    #     probabilities = np.ones((len(actions))) / len(actions)
+    #     return actions, probabilities
+    #
+    # @staticmethod
+    # def random_available_policy(state, observation):
+    #     """
+    #         Choose actions from a uniform distribution over currently available actions only.
+    #
+    #     :param state: the environment state
+    #     :param observation: the corresponding observation
+    #     :return: a tuple containing the actions and their probabilities
+    #     """
+    #     if hasattr(state, 'get_available_actions'):
+    #         available_actions = state.get_available_actions()
+    #     else:
+    #         available_actions = np.arange(state.action_space.n)
+    #     probabilities = np.ones((len(available_actions))) / len(available_actions)
+    #     return available_actions, probabilities
+    #
+    # @staticmethod
+    # def idle_policy(state, observation):
+    #     """
+    #         Choose idle action only.
+    #
+    #     :param state: the environment state
+    #     :param observation: the corresponding observation
+    #     :return: a tuple containing the actions and their probabilities
+    #     """
+    #     if hasattr(state, 'get_available_actions'):
+    #         available_actions = state.get_available_actions()
+    #     else:
+    #         available_actions = np.arange(state.action_space.n)
+    #     probabilities = np.zeros((len(available_actions)))
+    #     probabilities[1] = 1
+    #     return available_actions, probabilities
+    #
+    # @staticmethod
+    # def preference_policy(state, observation, action_index, ratio=2):
+    #     """
+    #         Choose actions with a distribution over currently available actions that favors a preferred action.
+    #
+    #         The preferred action probability is higher than others with a given ratio, and the distribution is uniform
+    #         over the non-preferred available actions.
+    #     :param state: the environment state
+    #     :param observation: the corresponding observation
+    #     :param action_index: the label of the preferred action
+    #     :param ratio: the ratio between the preferred action probability and the other available actions probabilities
+    #     :return: a tuple containing the actions and their probabilities
+    #     """
+    #     if hasattr(state, 'get_available_actions'):
+    #         available_actions = state.get_available_actions()
+    #         # print('available actions:', available_actions)
+    #     else:
+    #         available_actions = np.arange(state.action_space.n)
+    #     for i in range(len(available_actions)):
+    #         if available_actions[i] == action_index:
+    #             probabilities = np.ones((len(available_actions))) / (len(available_actions) - 1 + ratio)
+    #             probabilities[i] *= ratio
+    #             return available_actions, probabilities
+    #     return OSLAIDMAgent.random_available_policy(state, observation)
 
-        :param state: the environment state
-        :param observation: the corresponding observation
-        :return: a tuple containing the actions and their probabilities
-        """
-        actions = np.arange(state.action_space.n)
-        probabilities = np.ones((len(actions))) / len(actions)
-        return actions, probabilities
 
-    @staticmethod
-    def random_available_policy(state, observation):
-        """
-            Choose actions from a uniform distribution over currently available actions only.
-
-        :param state: the environment state
-        :param observation: the corresponding observation
-        :return: a tuple containing the actions and their probabilities
-        """
-        if hasattr(state, 'get_available_actions'):
-            available_actions = state.get_available_actions()
-        else:
-            available_actions = np.arange(state.action_space.n)
-        probabilities = np.ones((len(available_actions))) / len(available_actions)
-        return available_actions, probabilities
-
-    @staticmethod
-    def idle_policy(state, observation):
-        """
-            Choose idle action only.
-
-        :param state: the environment state
-        :param observation: the corresponding observation
-        :return: a tuple containing the actions and their probabilities
-        """
-        if hasattr(state, 'get_available_actions'):
-            available_actions = state.get_available_actions()
-        else:
-            available_actions = np.arange(state.action_space.n)
-        probabilities = np.zeros((len(available_actions)))
-        probabilities[1] = 1
-        return available_actions, probabilities
-
-    @staticmethod
-    def preference_policy(state, observation, action_index, ratio=2):
-        """
-            Choose actions with a distribution over currently available actions that favors a preferred action.
-
-            The preferred action probability is higher than others with a given ratio, and the distribution is uniform
-            over the non-preferred available actions.
-        :param state: the environment state
-        :param observation: the corresponding observation
-        :param action_index: the label of the preferred action
-        :param ratio: the ratio between the preferred action probability and the other available actions probabilities
-        :return: a tuple containing the actions and their probabilities
-        """
-        if hasattr(state, 'get_available_actions'):
-            available_actions = state.get_available_actions()
-            # print('available actions:', available_actions)
-        else:
-            available_actions = np.arange(state.action_space.n)
-        for i in range(len(available_actions)):
-            if available_actions[i] == action_index:
-                probabilities = np.ones((len(available_actions))) / (len(available_actions) - 1 + ratio)
-                probabilities[i] *= ratio
-                return available_actions, probabilities
-        return OSLAIDMAgent.random_available_policy(state, observation)
-
-
-class OSLAIDM(AbstractPlanner):
+class OSLAApprox(AbstractPlanner):
     """
        An implementation of One Step Look Ahead.
     """
-    def __init__(self, env, prior_policy, rollout_policy, config=None):
+    def __init__(self, env, config=None):
         """
-            New OSLAIDM instance.
+            New OSLAApprox instance.
 
-        :param config: the OSLAIDM configuration. Use default if None.
-        :param prior_policy: the prior policy used when expanding and selecting nodes
-        :param rollout_policy: the rollout policy used to estimate the value of a leaf node
+        :param config: the OSLAApprox configuration. Use default if None.
         """
         super().__init__(config)
         self.env = env
-        self.prior_policy = prior_policy
-        self.rollout_policy = rollout_policy
+        DQN_config = DQNAgent.default_config()
+        DQN_config.update({
+            "model": {
+                "type": "MultiLayerPerceptron",
+                "layers": [256, 256]
+            },
+            "double": False,
+        })
+        self.terminal_dqn = DQNAgent(env, config = DQN_config)
+        self.terminal_dqn.load('out/models/checkpoint-best.tar')
+        # self.prior_policy = prior_policy
+        # self.rollout_policy = rollout_policy
         if not self.config["horizon"]:
             self.config["episodes"], self.config["horizon"] = \
                 OLOP.allocation(self.config["budget"], self.config["gamma"])
 
     @classmethod
     def default_config(cls):
-        cfg = super(OSLAIDM, cls).default_config()
+        cfg = super(OSLAApprox, cls).default_config()
         cfg.update({
             "temperature": 0,
             "closed_loop": False
@@ -158,7 +167,7 @@ class OSLAIDM(AbstractPlanner):
 
     def reset(self):
         # print("reset__________________________")
-        self.root = OSLAIDMNode(parent=None, planner=self)
+        self.root = OSLAApproxNode(parent=None, planner=self)
 
     def run(self, state, observation, i):
         """
@@ -233,6 +242,7 @@ class OSLAIDM(AbstractPlanner):
             total_reward += self.config["gamma"] ** h * reward
             if np.all(terminal):
                 break
+        total_reward += max(self.terminal_dqn.get_state_action_values(observation))
         # state.action_type = action_factory(state, {"type": "DiscreteMetaAction"})
         return total_reward
 
@@ -248,29 +258,29 @@ class OSLAIDM(AbstractPlanner):
             self.run(state_simplified, observation, i)
         return self.get_plan()
 
-    def step_planner(self, action):
-        if self.config["step_strategy"] == "prior":
-            self.step_by_prior(action)
-        else:
-            super().step_planner(action)
+    # def step_planner(self, action):
+    #     if self.config["step_strategy"] == "prior":
+    #         self.step_by_prior(action)
+    #     else:
+    #         super().step_planner(action)
+    #
+    # def step_by_prior(self, action):
+    #     """
+    #         Replace the OSLAApprox tree by its subtree corresponding to the chosen action, but also convert the visit counts
+    #         to prior probabilities and before resetting them.
+    #
+    #     :param action: a chosen action from the root node
+    #     """
+    #     self.step_by_subtree(action)
+    #     self.root.convert_visits_to_prior_in_branch()
 
-    def step_by_prior(self, action):
-        """
-            Replace the OSLAIDM tree by its subtree corresponding to the chosen action, but also convert the visit counts
-            to prior probabilities and before resetting them.
 
-        :param action: a chosen action from the root node
-        """
-        self.step_by_subtree(action)
-        self.root.convert_visits_to_prior_in_branch()
-
-
-class OSLAIDMNode(Node):
+class OSLAApproxNode(Node):
     # K = 1.0
     """ The value function first-order filter gain"""
 
     def __init__(self, parent, planner, prior=1):
-        super(OSLAIDMNode, self).__init__(parent, planner)
+        super(OSLAApproxNode, self).__init__(parent, planner)
         self.value = 0
         self.prior = prior
 
@@ -341,7 +351,7 @@ class OSLAIDMNode(Node):
         child = self.children[action]
         if observation is not None:
             if str(observation) not in child.children:
-                child.children[str(observation)] = OSLAIDMNode(parent=child, planner=self.planner, prior=0)
+                child.children[str(observation)] = OSLAApproxNode(parent=child, planner=self.planner, prior=0)
             child = child.children[str(observation)]
         return child
 

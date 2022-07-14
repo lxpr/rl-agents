@@ -167,85 +167,43 @@ class MSLAIDM(AbstractPlanner):
         :param state: the initial environment state
         :param observation: the corresponding observation
         """
-        state = state.customer_simplify(30)
         depth = 0
         node = self.root
-        total_reward_table = np.zeros((5, 5))
+        total_reward = 0
         terminal = False
         state.seed(self.np_random.randint(2**30))
         action = i
         observation, reward, terminal, _ = self.step(state, action)
-        total_reward_table[:, :] += self.config["gamma"] ** depth * reward
+        total_reward += self.config["gamma"] ** depth * reward
         node_observation = observation if self.config["closed_loop"] else None
         node.expand_simple(i)
         node = node.get_child(action, observation=node_observation)
-        depth = 1
+        depth = 0
         for j in range(0, 5):
             action = j
-            observation, reward, terminal, _ = self.step(state, action)
-            total_reward_table[j, :] += self.config["gamma"] ** depth * reward
+            state_simplified_2 = safe_deepcopy_env(state)
+            observation, reward, terminal, _ = self.step(state_simplified_2, action)
+            total_reward_1 = total_reward + self.config["gamma"] ** depth * reward
             node_observation = observation if self.config["closed_loop"] else None
             node.expand_simple(j)
             node2 = node.get_child(action, observation=node_observation)
             depth += 1
             for k in range(0, 5):
                 action = k
-                observation, reward, terminal, _ = self.step(state, action)
-                total_reward_table[j, k] += self.config["gamma"] ** depth * reward
+                state_simplified_3 = safe_deepcopy_env(state_simplified_2)
+                observation, reward, terminal, _ = self.step(state_simplified_3, action)
+                total_reward_2 = total_reward_1 + self.config["gamma"] ** depth * reward
                 node_observation = observation if self.config["closed_loop"] else None
                 node2.expand_simple(k)
                 node3 = node2.get_child(action, observation=node_observation)
                 depth += 1
-                if not terminal:
-                    total_reward_table[j, k] = self.evaluate(state, observation, total_reward_table[j, k], depth=0)
-            total_reward = max(max(row) for row in total_reward_table)
-            node.update_branch(total_reward)
-
-
-
-        while depth < self.config['horizon'] and not terminal:
-            # print('horizon:', self.config['horizon'])
-            # action = node.sampling_rule(temperature=self.config['temperature'])
-            if depth == 0:
-                action = i
-                # action = node.sampling_rule(temperature=self.config['temperature'])
-                # print('action:', action)
-            else:
-                action = 1
-            # print('action:', action)
-            # print('depth:', depth)
-            observation, reward, terminal, _ = self.step(state, action)
-            # print(state)
-            total_reward += self.config["gamma"] ** depth * reward
-            node_observation = observation if self.config["closed_loop"] else None
-            if depth == 0:
-                node.expand_simple(i)
-            if not node.children:
-                node.expand_simple(1)
-
-            # print('children:', node.children)
-
-            node = node.get_child(action, observation=node_observation)
-            depth += 1
-        action = i
-        observation, reward, terminal, _ = self.step(state, action)
-        total_reward += self.config["gamma"] ** depth * reward
-        node_observation = observation if self.config["closed_loop"] else None
-        node.expand_simple(i)
-
-        if not terminal:
-            total_reward = self.evaluate(state, observation, total_reward, depth=0)
-
-        # print('depth:', depth)
-        # print('action:', i, 'total reward:', total_reward)
-
-        '''if not node.children \
-                and depth < self.config['horizon'] \
-                and (not terminal or node == self.root):
-            node.expand(self.prior_policy(state, observation))'''
-        node = node.get_child(action, observation=node_observation)
-
-        node.update_branch(total_reward)
+                total_reward_2 = self.evaluate(state_simplified_3, observation, total_reward_2, depth=depth)
+                node3.update(total_reward_2)
+                # print(i, j, k, total_reward_2)
+                if k == 0 or node2.value < node3.value:
+                    node2.update(total_reward_2)
+                    if j == 0 or node.value < node2.value:
+                        node.update(total_reward_2)
 
     def evaluate(self, state, observation, total_reward=0, depth=0):
         """
@@ -259,7 +217,7 @@ class MSLAIDM(AbstractPlanner):
         """
         # state.action_type = action_factory(state, {"type": "ContinuousAction"})
         # state.action_type.clip = False
-        idm_ego = IDMVehicle.create_from(state.road.vehicles[0])
+
         for h in range(depth, self.config["horizon"]):
             # '''actions, probabilities = self.rollout_policy(state, observation)
             # action = self.np_random.choice(actions, 1, p=np.array(probabilities))[0]
@@ -286,12 +244,14 @@ class MSLAIDM(AbstractPlanner):
         return total_reward
 
     def plan(self, state, observation):
+        self.reset()
         # print('epi:', self.config['episodes'])
         for i in range(self.config['episodes']):
-            # print('i:', i)
-            '''if (i+1) % 10 == 0:
-                logger.debug('{} / {}'.format(i+1, self.config['episodes']))'''
-            self.run(safe_deepcopy_env(state), observation, i)
+            state_simplified = state.customer_simplify_simplified_model(125)
+            state_simplified.config.update({
+                "simulation_frequency": 5  # [Hz]
+            })
+            self.run(state_simplified, observation, i)
         return self.get_plan()
 
     def step_planner(self, action):
@@ -353,16 +313,16 @@ class MSLAIDMNode(Node):
         """
         self.children[action] = type(self)(self, self.planner)
 
-    def expand(self, actions_distribution):
-        """
-            Expand a leaf node by creating a new child for each available action.
-
-        :param actions_distribution: the list of available actions and their prior probabilities
-        """
-        actions, probabilities = actions_distribution
-        for i in range(len(actions)):
-            if actions[i] not in self.children:
-                self.children[actions[i]] = type(self)(self, self.planner, probabilities[i])
+    # def expand(self, actions_distribution):
+    #     """
+    #         Expand a leaf node by creating a new child for each available action.
+    #
+    #     :param actions_distribution: the list of available actions and their prior probabilities
+    #     """
+    #     actions, probabilities = actions_distribution
+    #     for i in range(len(actions)):
+    #         if actions[i] not in self.children:
+    #             self.children[actions[i]] = type(self)(self, self.planner, probabilities[i])
 
     def update(self, total_reward):
         """
@@ -370,8 +330,7 @@ class MSLAIDMNode(Node):
 
         :param total_reward: the total reward obtained through a trajectory passing by this node
         """
-        self.count += 1
-        self.value += self.K / self.count * (total_reward - self.value)
+        self.value = total_reward
 
     def update_branch(self, total_reward):
         """
