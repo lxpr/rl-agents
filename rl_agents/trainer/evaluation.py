@@ -22,12 +22,9 @@ logger = logging.getLogger(__name__)
 
 def always_record_video_schedule(episode_id: int) -> bool:
     """The default episode trigger.
-
     This function will trigger recordings at every episode
-
     Args:
         episode_id: The episode number
-
     Returns:
         If to apply a video schedule number
     """
@@ -166,6 +163,9 @@ class Evaluation(object):
             duration = time.time() - start_time
             self.after_all_episodes(self.episode, rewards, duration, self.env.vehicle.crashed)
             self.after_some_episodes(self.episode, rewards)
+            self.env.render()
+            self.env.unwrapped.viewer.set_agent_display(
+                lambda agent_surface, sim_surface: AgentGraphics.display(self.agent, agent_surface, sim_surface))
 
     def step(self):
         """
