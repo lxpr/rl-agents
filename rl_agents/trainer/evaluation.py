@@ -164,7 +164,7 @@ class Evaluation(object):
 
             # End of episode
             duration = time.time() - start_time
-            self.after_all_episodes(self.episode, rewards, duration)
+            self.after_all_episodes(self.episode, rewards, duration, self.env.vehicle.crashed)
             self.after_some_episodes(self.episode, rewards)
 
     def step(self):
@@ -323,7 +323,7 @@ class Evaluation(object):
         except NotImplementedError:
             pass
 
-    def after_all_episodes(self, episode, rewards, duration):
+    def after_all_episodes(self, episode, rewards, duration, crashed):
         rewards = np.array(rewards)
         gamma = self.agent.config.get("gamma", 1)
         self.writer.add_scalar('episode/length', len(rewards), episode)
@@ -331,7 +331,7 @@ class Evaluation(object):
         self.writer.add_scalar('episode/return', sum(r*gamma**t for t, r in enumerate(rewards)), episode)
         self.writer.add_scalar('episode/fps', len(rewards) / max(duration, 1e-6), episode)
         self.writer.add_histogram('episode/rewards', rewards, episode)
-        logger.info("Episode {} score: {:.1f}".format(episode, sum(rewards)))
+        logger.info("Episode {} score: {:.1f} crashed: {}".format(episode, sum(rewards), crashed))
 
     def after_some_episodes(self, episode, rewards,
                             best_increase=1.1,
