@@ -20,6 +20,20 @@ from rl_agents.trainer.graphics import RewardViewer
 logger = logging.getLogger(__name__)
 
 
+def always_record_video_schedule(episode_id: int) -> bool:
+    """The default episode trigger.
+
+    This function will trigger recordings at every episode
+
+    Args:
+        episode_id: The episode number
+
+    Returns:
+        If to apply a video schedule number
+    """
+    return True
+
+
 class Evaluation(object):
     """
         The evaluation of an agent interacting with an environment to maximize its expected reward.
@@ -45,7 +59,6 @@ class Evaluation(object):
                  display_rewards=True,
                  close_env=True):
         """
-
         :param env: The environment to be solved, possibly wrapping an AbstractEnv environment
         :param AbstractAgent agent: The agent solving the environment
         :param Path directory: Workspace directory path
@@ -60,13 +73,12 @@ class Evaluation(object):
         :param display_agent: Add the agent graphics to the environment viewer, if supported
         :param display_rewards: Display the performances of the agent through the episodes
         :param close_env: Should the environment be closed when the evaluation is closed
-
         """
         self.env = env
         self.agent = agent
         self.num_episodes = num_episodes
         self.training = training
-        self.sim_seed = sim_seed
+        self.sim_seed = sim_seed if sim_seed is not None else np.random.randint(0, 1e6)
         self.close_env = close_env
         self.display_env = display_env
 
@@ -74,7 +86,7 @@ class Evaluation(object):
         self.run_directory = self.directory / (run_directory or self.default_run_directory)
         self.wrapped_env = RecordVideo(env,
                                        self.run_directory,
-                                       episode_trigger=(None if self.display_env else lambda e: False))
+                                       episode_trigger=(always_record_video_schedule if self.display_env else lambda e: False))
         try:
             self.wrapped_env.unwrapped.set_record_video_wrapper(self.wrapped_env)
         except AttributeError:
@@ -119,7 +131,6 @@ class Evaluation(object):
     def test(self):
         """
         Test the agent.
-
         If applicable, the agent model should be loaded before using the recover option.
         """
         self.training = False
@@ -136,8 +147,7 @@ class Evaluation(object):
         for self.episode in range(self.num_episodes):
             # Run episode
             terminal = False
-            self.seed(self.episode)
-            self.reset()
+            self.reset(seed=self.episode)
             rewards = []
             start_time = time.time()
             while not terminal:
@@ -174,11 +184,12 @@ class Evaluation(object):
 
         # Step the environment
         previous_observation, action = self.observation, actions[0]
-        self.observation, reward, terminal, info = self.wrapped_env.step(action)
+        self.observation, reward, done, truncated, info = self.wrapped_env.step(action)
+        terminal = done or truncated
 
         # Record the experience.
         try:
-            self.agent.record(previous_observation, action, reward, self.observation, terminal, info)
+            self.agent.record(previous_observation, action, reward, self.observation, done, info)
         except NotImplementedError:
             pass
 
@@ -240,9 +251,7 @@ class Evaluation(object):
     def collect_samples(environment_config, agent_config, count, start_time, seed, model_path, batch):
         """
             Collect interaction samples of an agent / environment pair.
-
             Note that the last episode may not terminate, when enough samples have been collected.
-
         :param dict environment_config: the environment configuration
         :param dict agent_config: the agent configuration
         :param int count: number of samples to collect
@@ -320,7 +329,7 @@ class Evaluation(object):
         self.writer.add_scalar('episode/length', len(rewards), episode)
         self.writer.add_scalar('episode/total_reward', sum(rewards), episode)
         self.writer.add_scalar('episode/return', sum(r*gamma**t for t, r in enumerate(rewards)), episode)
-        self.writer.add_scalar('episode/fps', len(rewards) / duration, episode)
+        self.writer.add_scalar('episode/fps', len(rewards) / max(duration, 1e-6), episode)
         self.writer.add_histogram('episode/rewards', rewards, episode)
         logger.info("Episode {} score: {:.1f}".format(episode, sum(rewards)))
 
@@ -361,14 +370,10 @@ class Evaluation(object):
         rl_agents.trainer.logger.configure()
         rl_agents.trainer.logger.add_file_handler(self.run_directory / self.LOGGING_FILE.format(file_infix))
 
-    def seed(self, episode=0):
-        seed = self.sim_seed + episode if self.sim_seed is not None else None
-        seed = self.wrapped_env.seed(seed)
-        self.agent.seed(seed[0])  # Seed the agent with the main environment seed
-        return seed
-
-    def reset(self):
-        self.observation = self.wrapped_env.reset()
+    def reset(self, seed=0):
+        seed = self.sim_seed + seed if self.sim_seed is not None else None
+        self.observation, info = self.wrapped_env.reset()
+        self.agent.seed(seed)  # Seed the agent with the main environment seed
         self.agent.reset()
 
     def close(self):
