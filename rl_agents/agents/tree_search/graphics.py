@@ -19,10 +19,10 @@ class TreeGraphics(object):
     def display(cls, agent, surface, max_depth=4):
         """
             Display the whole tree.
-
         :param agent: the agent to be displayed
         :param surface: the pygame surface on which the agent is displayed
         """
+        # print("display")
         if not surface:
             return
         import pygame
@@ -43,7 +43,6 @@ class TreeGraphics(object):
                      selected=False):
         """
             Display an MCTS node at a given position on a surface.
-
         :param node: the MCTS node to be displayed
         :param action_space: the environment action space
         :param surface: the pygame surface on which the node is displayed
