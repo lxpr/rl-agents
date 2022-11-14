@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 def agent_factory(environment, config):
     """
         Handles creation of agents.
-
     :param environment: the environment
     :param config: configuration of the agent, must contain a '__class__' key
     :return: a new agent
@@ -30,7 +29,6 @@ def agent_factory(environment, config):
 def load_agent(agent_config, env):
     """
         Load an agent from a configuration file.
-
     :param agent_config: dict or the path to the agent configuration file
     :param env: the environment with which the agent interacts
     :return: the agent
@@ -59,7 +57,6 @@ def load_agent_config(config_path):
 def load_environment(env_config):
     """
         Load an environment from a configuration file.
-
     :param env_config: the configuration, or path to the environment configuration file
     :return: the environment
     """
@@ -124,7 +121,7 @@ def safe_deepcopy_env(obj):
     result = cls.__new__(cls)
     memo = {id(obj): result}
     for k, v in obj.__dict__.items():
-        if k not in ['viewer', '_monitor', 'grid_render']:
+        if k not in ['viewer', '_monitor', 'grid_render', 'video_recorder', '_record_video_wrapper']:
             if isinstance(v, gym.Env):
                 setattr(result, k, safe_deepcopy_env(v))
             else:

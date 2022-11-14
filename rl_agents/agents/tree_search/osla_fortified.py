@@ -175,7 +175,7 @@ class OSLAFortified(AbstractPlanner):
             # state.seed(self.np_random.randint(2**30))
             # if state.config["controlled_vehicles"] > 1:  # Multi-agent setting
             #     action = tuple(i if agent_state else "IDM" for agent_state in state)
-            observation, reward, terminal, _ = self.step(state, action)
+            observation, reward, terminal, _, _ = self.step(state, action)
             # print('speed:', state.road.vehicles[0].target_speed)
             total_reward += self.config["gamma"] ** depth * reward
             node_observation = observation if self.config["closed_loop"] else None
@@ -185,7 +185,7 @@ class OSLAFortified(AbstractPlanner):
 
         else:
             # continuously slowing down
-            observation, reward, terminal, _ = self.step(state, "IDM") # Take the "IDM" action
+            observation, reward, terminal, _, _ = self.step(state, "IDM") # Take the "IDM" action
             # print('speed:', state.road.vehicles[0].target_speed)
             total_reward += self.config["gamma"] ** depth * reward
             node_observation = observation if self.config["closed_loop"] else None
@@ -234,9 +234,9 @@ class OSLAFortified(AbstractPlanner):
             # target_idm_steering = idm_ego.steering_control(idm_ego.target_lane_index)
             # action = [target_idm_acceleration, target_idm_steering]
             # # print(action)
-            # observation, reward, terminal, _ = self.step(state, action)
+            # observation, reward, terminal, _, _ = self.step(state, action)
             # print(state)
-            observation, reward, terminal, _ = self.step(state, "IDM")
+            observation, reward, terminal, _, _ = self.step(state, "IDM")
             total_reward += self.config["gamma"] ** h * reward
             if np.all(terminal):
                 break
@@ -254,7 +254,7 @@ class OSLAFortified(AbstractPlanner):
     #     :return: the total reward of the rollout trajectory
     #     """
     #     for h in range(depth, self.config["horizon"]):
-    #         observation, reward, terminal, _ = self.step(state, 4) # Keep selecting the "SLOWER" action
+    #         observation, reward, terminal, _, _ = self.step(state, 4) # Keep selecting the "SLOWER" action
     #         total_reward += self.config["gamma"] ** h * reward
     #         if np.all(terminal):
     #             break

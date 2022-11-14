@@ -26,7 +26,7 @@ class OSLAApproxAgent(AbstractTreeSearchAgent):
         config = super().default_config()
         config.update({
             "budget": 300,
-            "horizon": 10,
+            "horizon": 30,
             "episodes": 5,
             # "prior_policy": {
             #     "type": "preference",
@@ -184,7 +184,7 @@ class OSLAApprox(AbstractPlanner):
         action = i
         # if state.config["controlled_vehicles"] > 1:  # Multi-agent setting
         #     action = tuple(i if agent_state else "IDM" for agent_state in state)
-        observation, reward, terminal, _ = self.step(state, action)
+        observation, reward, terminal, _, _ = self.step(state, action)
         # print('speed:', state.road.vehicles[0].target_speed)
         total_reward += self.config["gamma"] ** depth * reward
         node_observation = observation if self.config["closed_loop"] else None
@@ -236,9 +236,9 @@ class OSLAApprox(AbstractPlanner):
             # target_idm_steering = idm_ego.steering_control(idm_ego.target_lane_index)
             # action = [target_idm_acceleration, target_idm_steering]
             # # print(action)
-            # observation, reward, terminal, _ = self.step(state, action)
+            # observation, reward, terminal, _, _ = self.step(state, action)
             # print(state)
-            observation, reward, terminal, _ = self.step(state, "IDM")
+            observation, reward, terminal, _, _ = self.step(state, "IDM")
             total_reward += self.config["gamma"] ** h * reward
             if np.all(terminal):
                 break

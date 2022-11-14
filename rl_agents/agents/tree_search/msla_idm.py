@@ -25,7 +25,7 @@ class MSLAIDMAgent(AbstractTreeSearchAgent):
         config = super().default_config()
         config.update({
             "budget": 300,
-            "horizon": 10,
+            "horizon": 10, # 10,
             "episodes": 5,
             "gamma": 0.99,
             "prior_policy": {
@@ -173,7 +173,7 @@ class MSLAIDM(AbstractPlanner):
         terminal = False
         state.seed(self.np_random.randint(2**30))
         action = i
-        observation, reward, terminal, _ = self.step(state, action)
+        observation, reward, terminal, _, _ = self.step(state, action)
         total_reward += self.config["gamma"] ** depth * reward
         node_observation = observation if self.config["closed_loop"] else None
         node.expand_simple(i)
@@ -182,7 +182,7 @@ class MSLAIDM(AbstractPlanner):
         for j in range(0, 5):
             action = j
             state_simplified_2 = safe_deepcopy_env(state)
-            observation, reward, terminal, _ = self.step(state_simplified_2, action)
+            observation, reward, terminal, _, _ = self.step(state_simplified_2, action)
             total_reward_1 = total_reward + self.config["gamma"] ** depth * reward
             node_observation = observation if self.config["closed_loop"] else None
             node.expand_simple(j)
@@ -191,7 +191,7 @@ class MSLAIDM(AbstractPlanner):
             for k in range(0, 5):
                 action = k
                 state_simplified_3 = safe_deepcopy_env(state_simplified_2)
-                observation, reward, terminal, _ = self.step(state_simplified_3, action)
+                observation, reward, terminal, _, _ = self.step(state_simplified_3, action)
                 total_reward_2 = total_reward_1 + self.config["gamma"] ** depth * reward
                 node_observation = observation if self.config["closed_loop"] else None
                 node2.expand_simple(k)
@@ -235,7 +235,7 @@ class MSLAIDM(AbstractPlanner):
             # idm_ego.change_lane_policy()
             # target_idm_steering = idm_ego.steering_control(idm_ego.target_lane_index)
             # action = [target_idm_acceleration, target_idm_steering]
-            observation, reward, terminal, _ = self.step(state, "IDM")
+            observation, reward, terminal, _, _ = self.step(state, "IDM")
             # print(state)
             total_reward += self.config["gamma"] ** h * reward
             if np.all(terminal):

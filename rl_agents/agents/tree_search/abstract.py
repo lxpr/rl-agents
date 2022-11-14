@@ -50,9 +50,7 @@ class AbstractTreeSearchAgent(AbstractAgent):
     def plan(self, observation):
         """
             Plan an optimal sequence of actions.
-
             Start by updating the previously found tree with the last action performed.
-
         :param observation: the current state
         :return: the list of actions
         """
@@ -134,7 +132,6 @@ class AbstractPlanner(Configurable):
     def plan(self, state, observation):
         """
             Plan an optimal sequence of actions.
-
         :param state: the initial environment state
         :param observation: the corresponding state observation
         :return: the actions sequence
@@ -145,7 +142,6 @@ class AbstractPlanner(Configurable):
         """
             Get the optimal action sequence of the current tree by recursively selecting the best action within each
             node with no exploration.
-
         :return: the list of actions
         """
         actions = []
@@ -157,9 +153,9 @@ class AbstractPlanner(Configurable):
         return actions
 
     def step(self, state, action):
-        observation, reward, done, info = state.step(action)
-        self.observations.append(observation)
-        return observation, reward, done, info
+        step_data = state.step(action)
+        self.observations.append(step_data[0])
+        return step_data
 
     def get_visits(self):
         visits = defaultdict(int)
@@ -173,7 +169,6 @@ class AbstractPlanner(Configurable):
     def step_tree(self, actions):
         """
             Update the planner tree when the agent performs an action
-
         :param actions: a sequence of actions to follow from the root node
         """
         if self.config["step_strategy"] == "reset":
@@ -196,7 +191,6 @@ class AbstractPlanner(Configurable):
     def step_by_subtree(self, action):
         """
             Replace the planner tree by its subtree corresponding to the chosen action.
-
         :param action: a chosen action from the root node
         """
         if action in self.root.children:
@@ -218,7 +212,6 @@ class Node(object):
     def __init__(self, parent, planner):
         """
             New node.
-
         :param parent: its parent node
         :param planner: the planner using the node
         """
@@ -248,7 +241,6 @@ class Node(object):
     def breadth_first_search(root, operator=None, condition=None, condition_blocking=True):
         """
             Breadth-first search of all paths to nodes that meet a given condition
-
         :param root: starting node
         :param operator: will be applied to all traversed nodes
         :param condition: nodes meeting that condition will be returned
@@ -320,7 +312,6 @@ class Node(object):
     def get_trajectories(self, full_trajectories=True, include_leaves=True):
         """
             Get a list of visited nodes corresponding to the node subtree
-
         :param full_trajectories: return a list of observation sequences, else a list of observations
         :param include_leaves: include leaves or only expanded nodes
         :return: the list of trajectories
