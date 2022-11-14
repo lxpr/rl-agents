@@ -31,6 +31,9 @@ from rl_agents.trainer import logger
 from rl_agents.trainer.evaluation import Evaluation
 from rl_agents.agents.common.factory import load_agent, load_environment
 
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+
 BENCHMARK_FILE = 'benchmark_summary'
 LOGGING_CONFIG = 'configs/logging.json'
 VERBOSE_CONFIG = 'configs/verbose.json'
@@ -79,7 +82,7 @@ def evaluate(environment_config, agent_config, options):
         evaluation.test()
     else:
         evaluation.close()
-    return os.path.relpath(evaluation.monitor.directory)
+    return os.path.relpath(evaluation.run_directory)
 
 
 def benchmark(options):
