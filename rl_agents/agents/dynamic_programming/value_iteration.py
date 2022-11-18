@@ -32,8 +32,6 @@ class ValueIterationAgent(AbstractAgent):
             self.mdp = self.env.unwrapped.to_finite_mdp()
             state = self.mdp.state
             self.state_action_value = self.get_state_action_value()
-        print("state:", state)
-        print("StateActionValue:", self.state_action_value[state, :])
         return np.argmax(self.state_action_value[state, :])
 
     def get_state_value(self):
