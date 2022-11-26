@@ -1,0 +1,4 @@
+{
+    "__class__": "<class 'rl_agents.agents.rollout_grid.osla_grid.OSLAGridAgent'>",
+    "gamma": 0.99
+}

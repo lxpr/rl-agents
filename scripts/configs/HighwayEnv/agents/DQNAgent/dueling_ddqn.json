@@ -3,13 +3,13 @@
     "model": {
         "type": "DuelingNetwork",
         "base_module": {
-            "layers": [256, 256]
+            "layers": [256, 128]
         },
         "value": {
-            "layers": []
+            "layers": [128]
         },
         "advantage": {
-            "layers": []
+            "layers": [128]
         }
     }
 }
