@@ -48,9 +48,21 @@ class OSLAGridAgent(AbstractAgent):
                     # print(a, step, "terminal")
                     continue
             for step in range(depth + 1, self.config["horizon"]):
-                # Always choose "IDLE" action in base policy
-                state = self.mdp.transition[state, 1]
-                reward_for_actions[a] += self.config["gamma"] ** step * self.mdp.reward[state, 1]
+
+                # Select the action with longest time to collision
+                ttc_idle = self.mdp.ttc[self.mdp.transition[state, 1]]
+                best_other_action = np.argmax(self.mdp.ttc[self.mdp.transition[state, [0, 2, 3, 4]]])
+                if self.mdp.ttc[self.mdp.transition[state, best_other_action]] > ttc_idle:
+                    if best_other_action > 0:
+                        best_other_action += 1
+                    action = best_other_action
+                else:
+                    action = 1
+                state = self.mdp.transition[state, action]
+                # reward_for_actions[a] += self.config["gamma"] ** step * self.mdp.reward[state, action]
+                # # Always choose "IDLE" action in base policy
+                # state = self.mdp.transition[state, 1]
+                # reward_for_actions[a] += self.config["gamma"] ** step * self.mdp.reward[state, 1]
                 # # Select the action with best reward at the next state
                 # next_rewards = np.zeros(self.mdp.transition.shape[1])
                 # for available_action in range(self.mdp.transition.shape[1]):
