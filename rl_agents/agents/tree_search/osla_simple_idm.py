@@ -241,6 +241,7 @@ class OSLAIDM(AbstractPlanner):
         # print('epi:', self.config['episodes'])
         for i in range(self.config['episodes']):
             state_simplified = state.customer_simplify_simplified_model(200)
+            # state_simplified = safe_deepcopy_env(state)
             state_simplified.config.update({
                 "simulation_frequency": 5  # [Hz]
             })

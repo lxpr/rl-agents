@@ -56,15 +56,17 @@ class MSLAGridAgent(AbstractAgent):
                     reward_for_actions_2[a_2] += self.config["gamma"] ** (depth + 2) * self.mdp.reward[state, a_2]
                     for step in range(depth + 3, self.config["horizon"]):
                         # Select the action with longest time to collision
-                        ttc_idle = self.mdp.ttc[self.mdp.transition[state, 1]]
-                        best_other_action = np.argmax(self.mdp.ttc[self.mdp.transition[state, [0, 2, 3, 4]]])
-                        if self.mdp.ttc[self.mdp.transition[state, best_other_action]] > ttc_idle:
-                            if best_other_action > 0:
-                                best_other_action += 1
-                            action = best_other_action
-                        else:
-                            action = 1
+                        # ttc_idle = self.mdp.ttc[self.mdp.transition[state, 1]]
+                        # best_other_action = np.argmax(self.mdp.ttc[self.mdp.transition[state, [0, 2, 3, 4]]])
+                        # if self.mdp.ttc[self.mdp.transition[state, best_other_action]] > ttc_idle:
+                        #     if best_other_action > 0:
+                        #         best_other_action += 1
+                        #     action = best_other_action
+                        # else:
+                        #     action = 1
+                        action = np.argmax(self.mdp.ttc[self.mdp.transition[state, range(self.mdp.transition.shape[1])]])
                         state = self.mdp.transition[state, action]
+                        reward_for_actions_2[a_2] += self.config["gamma"] ** step * self.mdp.reward[state, action]
                         # # Always choose "IDLE" action in base policy
                         # state = self.mdp.transition[state, 1]
                         # reward_for_actions_2[a_2] += self.config["gamma"] ** step * self.mdp.reward[state, 1]
