@@ -171,7 +171,7 @@ class MSLAIDM(AbstractPlanner):
         node = self.root
         total_reward = 0
         terminal = False
-        state.seed(self.np_random.randint(2**30))
+        # state.seed(self.np_random.randint(2**30))
         action = i
         observation, reward, terminal, _, _ = self.step(state, action)
         total_reward += self.config["gamma"] ** depth * reward
@@ -247,10 +247,11 @@ class MSLAIDM(AbstractPlanner):
         self.reset()
         # print('epi:', self.config['episodes'])
         for i in range(self.config['episodes']):
-            state_simplified = state.customer_simplify_simplified_model(200)
-            state_simplified.config.update({
-                "simulation_frequency": 5  # [Hz]
-            })
+            state_simplified = safe_deepcopy_env(state)
+            # state_simplified = state.customer_simplify_simplified_model(200)
+            # state_simplified.config.update({
+            #     "simulation_frequency": 5  # [Hz]
+            # })
             self.run(state_simplified, observation, i)
         return self.get_plan()
 
