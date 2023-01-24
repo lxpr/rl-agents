@@ -47,37 +47,41 @@ class MSLAGridAgent(AbstractAgent):
             state_1 = self.mdp.transition[state_0, a_0]
             reward_for_actions[a_0] += self.config["gamma"] ** depth * self.mdp.reward[state_1, a_0]
             reward_for_actions_1 = reward_for_actions[a_0] * np.ones(self.mdp.transition.shape[1])
-            for a_1 in range(self.mdp.transition.shape[1]):
-                state_2 = self.mdp.transition[state_1, a_1]
-                reward_for_actions_1[a_1] += self.config["gamma"] ** (depth + 1) * self.mdp.reward[state_2, a_1]
-                reward_for_actions_2 = reward_for_actions_1[a_1] * np.ones(self.mdp.transition.shape[1])
-                for a_2 in range(self.mdp.transition.shape[1]):
-                    state = self.mdp.transition[state_2, a_2]
-                    reward_for_actions_2[a_2] += self.config["gamma"] ** (depth + 2) * self.mdp.reward[state, a_2]
-                    for step in range(depth + 3, self.config["horizon"]):
-                        # Select the action with longest time to collision
-                        # ttc_idle = self.mdp.ttc[self.mdp.transition[state, 1]]
-                        # best_other_action = np.argmax(self.mdp.ttc[self.mdp.transition[state, [0, 2, 3, 4]]])
-                        # if self.mdp.ttc[self.mdp.transition[state, best_other_action]] > ttc_idle:
-                        #     if best_other_action > 0:
-                        #         best_other_action += 1
-                        #     action = best_other_action
-                        # else:
-                        #     action = 1
-                        action = np.argmax(self.mdp.ttc[self.mdp.transition[state, range(self.mdp.transition.shape[1])]])
-                        state = self.mdp.transition[state, action]
-                        reward_for_actions_2[a_2] += self.config["gamma"] ** step * self.mdp.reward[state, action]
-                        # # Always choose "IDLE" action in base policy
-                        # state = self.mdp.transition[state, 1]
-                        # reward_for_actions_2[a_2] += self.config["gamma"] ** step * self.mdp.reward[state, 1]
-                        # # Select the action with best reward at the next state
-                        # next_rewards = np.zeros(self.mdp.transition.shape[1])
-                        # for available_action in range(self.mdp.transition.shape[1]):
-                        #     next_state = self.mdp.transition[state, available_action]
-                        #     next_rewards[available_action] = self.mdp.reward[next_state, available_action]
-                        # action = np.argmax(next_rewards)
-                        # state = self.mdp.transition[state, action]
-                        # reward_for_actions[a] += self.config["gamma"] ** step * self.mdp.reward[state, action]
+            if self.mdp.ttc[state_1] >= 1:
+                for a_1 in range(self.mdp.transition.shape[1]):
+                    state_2 = self.mdp.transition[state_1, a_1]
+                    reward_for_actions_1[a_1] += self.config["gamma"] ** (depth + 1) * self.mdp.reward[state_2, a_1]
+                    reward_for_actions_2 = reward_for_actions_1[a_1] * np.ones(self.mdp.transition.shape[1])
+                    if self.mdp.ttc[state_2] >= 1:
+                        for a_2 in range(self.mdp.transition.shape[1]):
+                            state = self.mdp.transition[state_2, a_2]
+                            reward_for_actions_2[a_2] += self.config["gamma"] ** (depth + 2) * self.mdp.reward[state, a_2]
+                            for step in range(depth + 3, self.config["horizon"]):
+                                # Select the action with longest time to collision
+                                # ttc_idle = self.mdp.ttc[self.mdp.transition[state, 1]]
+                                # best_other_action = np.argmax(self.mdp.ttc[self.mdp.transition[state, [0, 2, 3, 4]]])
+                                # if self.mdp.ttc[self.mdp.transition[state, best_other_action]] > ttc_idle:
+                                #     if best_other_action > 0:
+                                #         best_other_action += 1
+                                #     action = best_other_action
+                                # else:
+                                #     action = 1
+                                if self.mdp.ttc[state] < 1:
+                                    break
+                                action = np.argmax(self.mdp.ttc[self.mdp.transition[state, range(self.mdp.transition.shape[1])]])
+                                state = self.mdp.transition[state, action]
+                                reward_for_actions_2[a_2] += self.config["gamma"] ** step * self.mdp.reward[state, action]
+                                # # Always choose "IDLE" action in base policy
+                                # state = self.mdp.transition[state, 1]
+                                # reward_for_actions_2[a_2] += self.config["gamma"] ** step * self.mdp.reward[state, 1]
+                                # # Select the action with best reward at the next state
+                                # next_rewards = np.zeros(self.mdp.transition.shape[1])
+                                # for available_action in range(self.mdp.transition.shape[1]):
+                                #     next_state = self.mdp.transition[state, available_action]
+                                #     next_rewards[available_action] = self.mdp.reward[next_state, available_action]
+                                # action = np.argmax(next_rewards)
+                                # state = self.mdp.transition[state, action]
+                                # reward_for_actions[a] += self.config["gamma"] ** step * self.mdp.reward[state, action]
                 reward_for_actions_1[a_1] += max(reward_for_actions_2)
             reward_for_actions[a_0] += max(reward_for_actions_1)
         return reward_for_actions

@@ -58,6 +58,8 @@ class OSLAGridAgent(AbstractAgent):
                 #     action = best_other_action
                 # else:
                 #     action = 1
+                if self.mdp.ttc[state] < 1:
+                    break
                 action = np.argmax(self.mdp.ttc[self.mdp.transition[state, range(self.mdp.transition.shape[1])]])
                 # action = 1
                 state = self.mdp.transition[state, action]
