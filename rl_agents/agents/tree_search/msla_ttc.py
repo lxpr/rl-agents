@@ -11,146 +11,41 @@ from highway_env.envs.common.action import action_factory
 logger = logging.getLogger(__name__)
 
 
-class MSLAIDMAgent(AbstractTreeSearchAgent):
+class MSLATTCAgent(AbstractTreeSearchAgent):
     """
         An agent that uses One Step Look Ahead to plan a sequence of action in an MDP.
     """
     def make_planner(self):
-        prior_policy = MSLAIDMAgent.policy_factory(self.config["prior_policy"])
-        rollout_policy = MSLAIDMAgent.policy_factory(self.config["rollout_policy"])
-        return MSLAIDM(self.env, prior_policy, rollout_policy, self.config)
+        return MSLATTC(self.env, self.config)
 
     @classmethod
     def default_config(cls):
         config = super().default_config()
         config.update({
-            "budget": 300,
             "horizon": 10, # 10,
             "episodes": 5,
             "gamma": 0.99,
-            "prior_policy": {
-                "type": "preference",
-                "action": 3,
-                "ratio": 2
-            },
-            "rollout_policy": {"type": "preference",
-                "action": 1,
-                "ratio": 3
-                },
             "env_preprocessors": []
          })
         return config
 
-    @staticmethod
-    def policy_factory(policy_config):
-        if policy_config["type"] == "random":
-            return MSLAIDMAgent.random_policy
-        elif policy_config["type"] == "random_available":
-            return MSLAIDMAgent.random_available_policy
-        elif policy_config["type"] == "preference":
-            return partial(MSLAIDMAgent.preference_policy,
-                           action_index=policy_config["action"],
-                           ratio=policy_config["ratio"])
-        elif policy_config["type"] == "idle":
-            return MSLAIDMAgent.idle_policy
-        else:
-            raise ValueError("Unknown policy type")
 
-    @staticmethod
-    def random_policy(state, observation):
-        """
-            Choose actions from a uniform distribution.
-
-        :param state: the environment state
-        :param observation: the corresponding observation
-        :return: a tuple containing the actions and their probabilities
-        """
-        actions = np.arange(state.action_space.n)
-        probabilities = np.ones((len(actions))) / len(actions)
-        return actions, probabilities
-
-    @staticmethod
-    def random_available_policy(state, observation):
-        """
-            Choose actions from a uniform distribution over currently available actions only.
-
-        :param state: the environment state
-        :param observation: the corresponding observation
-        :return: a tuple containing the actions and their probabilities
-        """
-        if hasattr(state, 'get_available_actions'):
-            available_actions = state.get_available_actions()
-        else:
-            available_actions = np.arange(state.action_space.n)
-        probabilities = np.ones((len(available_actions))) / len(available_actions)
-        return available_actions, probabilities
-
-    @staticmethod
-    def idle_policy(state, observation):
-        """
-            Choose idle action only.
-
-        :param state: the environment state
-        :param observation: the corresponding observation
-        :return: a tuple containing the actions and their probabilities
-        """
-        if hasattr(state, 'get_available_actions'):
-            available_actions = state.get_available_actions()
-        else:
-            available_actions = np.arange(state.action_space.n)
-        probabilities = np.zeros((len(available_actions)))
-        probabilities[1] = 1
-        return available_actions, probabilities
-
-    @staticmethod
-    def preference_policy(state, observation, action_index, ratio=2):
-        """
-            Choose actions with a distribution over currently available actions that favors a preferred action.
-
-            The preferred action probability is higher than others with a given ratio, and the distribution is uniform
-            over the non-preferred available actions.
-        :param state: the environment state
-        :param observation: the corresponding observation
-        :param action_index: the label of the preferred action
-        :param ratio: the ratio between the preferred action probability and the other available actions probabilities
-        :return: a tuple containing the actions and their probabilities
-        """
-        if hasattr(state, 'get_available_actions'):
-            available_actions = state.get_available_actions()
-            # print('available actions:', available_actions)
-        else:
-            available_actions = np.arange(state.action_space.n)
-        for i in range(len(available_actions)):
-            if available_actions[i] == action_index:
-                probabilities = np.ones((len(available_actions))) / (len(available_actions) - 1 + ratio)
-                probabilities[i] *= ratio
-                return available_actions, probabilities
-        return MSLAIDMAgent.random_available_policy(state, observation)
-
-
-class MSLAIDM(AbstractPlanner):
+class MSLATTC(AbstractPlanner):
     """
        An implementation of One Step Look Ahead, with Upper Confidence Tree exploration.
     """
-    def __init__(self, env, prior_policy, rollout_policy, config=None):
+    def __init__(self, env, config=None):
         """
-            New MSLAIDM instance.
+            New MSLATTC instance.
 
-        :param config: the MSLAIDM configuration. Use default if None.
-        :param prior_policy: the prior policy used when expanding and selecting nodes
-        :param rollout_policy: the rollout policy used to estimate the value of a leaf node
+        :param config: the MSLATTC configuration. Use default if None.
         """
         super().__init__(config)
         self.env = env
-        self.prior_policy = prior_policy
-        self.rollout_policy = rollout_policy
-        if not self.config["horizon"]:
-            self.config["episodes"], self.config["horizon"] = \
-                OLOP.allocation(self.config["budget"], self.config["gamma"])
 
     @classmethod
     def default_config(cls):
-        cfg = super(MSLAIDM, cls).default_config()
+        cfg = super(MSLATTC, cls).default_config()
         cfg.update({
             "temperature": 0,
             "closed_loop": False
@@ -158,7 +53,7 @@ class MSLAIDM(AbstractPlanner):
         return cfg
 
     def reset(self):
-        self.root = MSLAIDMNode(parent=None, planner=self)
+        self.root = MSLATTCNode(parent=None, planner=self)
 
     def run(self, state, observation, i):
         """
@@ -171,32 +66,37 @@ class MSLAIDM(AbstractPlanner):
         node = self.root
         total_reward = 0
         terminal = False
-        # state.seed(self.np_random.randint(2**30))
         action = i
         observation, reward, terminal, _, _ = self.step(state, action)
         total_reward += self.config["gamma"] ** depth * reward
         node_observation = observation if self.config["closed_loop"] else None
-        node.expand_simple(i)
+        node.expand_simple(action)
         node = node.get_child(action, observation=node_observation)
         depth = 1
+        if terminal:
+            return
         for j in range(0, 5):
             action = j
             state_simplified_2 = safe_deepcopy_env(state)
             observation, reward, terminal, _, _ = self.step(state_simplified_2, action)
             total_reward_1 = total_reward + self.config["gamma"] ** depth * reward
             node_observation = observation if self.config["closed_loop"] else None
-            node.expand_simple(j)
+            node.expand_simple(action)
             node2 = node.get_child(action, observation=node_observation)
             depth = 2
+            if terminal:
+                continue
             for k in range(0, 5):
                 action = k
                 state_simplified_3 = safe_deepcopy_env(state_simplified_2)
                 observation, reward, terminal, _, _ = self.step(state_simplified_3, action)
                 total_reward_2 = total_reward_1 + self.config["gamma"] ** depth * reward
                 node_observation = observation if self.config["closed_loop"] else None
-                node2.expand_simple(k)
+                node2.expand_simple(action)
                 node3 = node2.get_child(action, observation=node_observation)
                 depth = 3
+                if terminal:
+                    continue
                 total_reward_2 = self.evaluate(state_simplified_3, observation, total_reward_2, depth=depth)
                 node3.update(total_reward_2)
                 if k == 0 or node2.value < node3.value:
@@ -216,43 +116,23 @@ class MSLAIDM(AbstractPlanner):
         :param depth: the initial simulation depth
         :return: the total reward of the rollout trajectory
         """
-        # state.action_type = action_factory(state, {"type": "ContinuousAction"})
-        # state.action_type.clip = False
 
         for h in range(depth, self.config["horizon"]):
-            # '''actions, probabilities = self.rollout_policy(state, observation)
-            # action = self.np_random.choice(actions, 1, p=np.array(probabilities))[0]
-            # action = idm_ego.acceleration()
-            # print(action)'''
-            # front_vehicle, rear_vehicle = idm_ego.road.neighbour_vehicles(idm_ego, idm_ego.target_lane_index)
-            # target_idm_acceleration = idm_ego.acceleration(ego_vehicle=idm_ego,
-            #                                             front_vehicle=front_vehicle,
-            #                                             rear_vehicle=rear_vehicle)
-            # # print(target_idm_acceleration)
-            # '''action = {
-            #     "acceleration": target_idm_acceleration,
-            #     "steering": 0,
-            #         }'''
-            # idm_ego.change_lane_policy()
-            # target_idm_steering = idm_ego.steering_control(idm_ego.target_lane_index)
-            # action = [target_idm_acceleration, target_idm_steering]
-            observation, reward, terminal, _, _ = self.step(state, "IDM")
-            # print(state)
+            mdp = state.unwrapped.to_finite_mdp()
+            action = np.argmax(mdp.ttc[mdp.transition[mdp.state, range(mdp.transition.shape[1])]])
+            observation, reward, terminal, _, _ = self.step(state, action)
             total_reward += self.config["gamma"] ** h * reward
             if np.all(terminal):
                 break
-        # state.action_type = action_factory(state, {"type": "DiscreteMetaAction"})
         return total_reward
 
     def plan(self, state, observation):
         self.reset()
-        # print('epi:', self.config['episodes'])
         for i in range(self.config['episodes']):
-            state_simplified = safe_deepcopy_env(state)
-            # state_simplified = state.customer_simplify_simplified_model(200)
-            # state_simplified.config.update({
-            #     "simulation_frequency": 5  # [Hz]
-            # })
+            state_simplified = state.customer_simplify_simplified_model(100)
+            state_simplified.config.update({
+                "simulation_frequency": 5  # [Hz]
+            })
             self.run(state_simplified, observation, i)
         return self.get_plan()
 
@@ -264,21 +144,21 @@ class MSLAIDM(AbstractPlanner):
 
     def step_by_prior(self, action):
         """
-            Replace the MSLAIDM tree by its subtree corresponding to the chosen action, but also convert the visit counts
+            Replace the MSLATTC tree by its subtree corresponding to the chosen action, but also convert the visit counts
             to prior probabilities and before resetting them.
 
         :param action: a chosen action from the root node
         """
         self.step_by_subtree(action)
-        self.root.convert_visits_to_prior_in_branch()
+        # self.root.convert_visits_to_prior_in_branch()
 
 
-class MSLAIDMNode(Node):
+class MSLATTCNode(Node):
     K = 1.0
     """ The value function first-order filter gain"""
 
     def __init__(self, parent, planner, prior=1):
-        super(MSLAIDMNode, self).__init__(parent, planner)
+        super(MSLATTCNode, self).__init__(parent, planner)
         self.value = 0
         self.prior = prior
 
@@ -315,17 +195,6 @@ class MSLAIDMNode(Node):
         """
         self.children[action] = type(self)(self, self.planner)
 
-    # def expand(self, actions_distribution):
-    #     """
-    #         Expand a leaf node by creating a new child for each available action.
-    #
-    #     :param actions_distribution: the list of available actions and their prior probabilities
-    #     """
-    #     actions, probabilities = actions_distribution
-    #     for i in range(len(actions)):
-    #         if actions[i] not in self.children:
-    #             self.children[actions[i]] = type(self)(self, self.planner, probabilities[i])
-
     def update(self, total_reward):
         """
             Update the visit count and value of this node, given a sample of total reward.
@@ -348,7 +217,7 @@ class MSLAIDMNode(Node):
         child = self.children[action]
         if observation is not None:
             if str(observation) not in child.children:
-                child.children[str(observation)] = MSLAIDMNode(parent=child, planner=self.planner, prior=0)
+                child.children[str(observation)] = MSLATTCNode(parent=child, planner=self.planner, prior=0)
             child = child.children[str(observation)]
         return child
 
@@ -362,8 +231,6 @@ class MSLAIDMNode(Node):
         if not self.parent:
             return self.get_value()
 
-        # return self.value + temperature * self.prior * np.sqrt(np.log(self.parent.count) / self.count)
-        # return self.get_value()
         return self.get_value() + temperature * len(self.parent.children) * self.prior/(self.count+1)
 
     def convert_visits_to_prior_in_branch(self, regularization=0.5):

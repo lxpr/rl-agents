@@ -22,7 +22,6 @@ class TreeGraphics(object):
         :param agent: the agent to be displayed
         :param surface: the pygame surface on which the agent is displayed
         """
-        # print("display")
         if not surface:
             return
         import pygame
@@ -86,14 +85,16 @@ class TreeGraphics(object):
         import pygame
         cmap = cm.jet_r
         norm = mpl.colors.Normalize(vmin=0, vmax=1 / (1 - config["gamma"]))
-        color = cmap(norm(node.get_value()), bytes=True)
+        # color = cmap(norm(node.get_value()), bytes=True)
+        color = cmap(config["horizon"] / 2 * norm(node.get_value()), bytes=True)
         pygame.draw.rect(surface, color, (origin[0], origin[1], size[0], size[1]), 0)
 
     @classmethod
     def display_text(cls, node, surface, origin, config):
         import pygame
         font = pygame.font.Font(None, 13)
-        text = "{:.2f} / {}".format(node.get_value(), node.count)
+        # text = "{:.2f} / {}".format(node.get_value(), node.count)
+        text = "{:.2f}".format(node.get_value())
         text = font.render(text,
                            1, (10, 10, 10), (255, 255, 255))
         surface.blit(text, (origin[0] + 1, origin[1] + 1))
